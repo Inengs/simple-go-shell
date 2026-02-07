@@ -28,7 +28,7 @@ type CommandDetails struct{
 // ErrorFile: err.txt
 
 func Parse(line string) (*Result, error){
-
+	return
 }
 
 func tokenize(input string) ([]string, error) { // this is to produce []string where each element is one argument/operator/filename
