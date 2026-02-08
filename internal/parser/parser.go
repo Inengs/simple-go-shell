@@ -28,7 +28,62 @@ type CommandDetails struct{
 // ErrorFile: err.txt
 
 func Parse(line string) (*Result, error){
-	return
+	// function Parse(line):
+
+    // tokens = tokenize(line)
+    // if error → return error
+
+    // create empty CommandDetails cmd
+
+    // i = 0
+    // while i < length(tokens):
+
+    //     token = tokens[i]
+
+    //     switch token:
+
+    //         case "<":
+    //             if i+1 >= len(tokens):
+    //                 return error("missing input file")
+    //             cmd.InputFile = tokens[i+1]
+    //             i = i + 2
+    //             continue
+
+    //         case ">":
+    //             if i+1 >= len(tokens):
+    //                 return error("missing output file")
+    //             cmd.OutputFile = tokens[i+1]
+    //             cmd.Append = false
+    //             i = i + 2
+    //             continue
+
+    //         case ">>":
+    //             if i+1 >= len(tokens):
+    //                 return error("missing output file")
+    //             cmd.OutputFile = tokens[i+1]
+    //             cmd.Append = true
+    //             i = i + 2
+    //             continue
+
+    //         case "2>":
+    //             if i+1 >= len(tokens):
+    //                 return error("missing error file")
+    //             cmd.ErrorFile = tokens[i+1]
+    //             i = i + 2
+    //             continue
+
+    //         case "&":
+    //             cmd.Background = true
+    //             i = i + 1
+    //             continue
+
+    //         default:
+    //             append token to cmd.Args
+    //             i = i + 1
+
+    // if cmd.Args is empty:
+    //     return error("no command provided")
+
 }
 
 func tokenize(input string) ([]string, error) { // this is to produce []string where each element is one argument/operator/filename
