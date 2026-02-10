@@ -27,63 +27,74 @@ type CommandDetails struct{
 // InputFile: in.txt
 // ErrorFile: err.txt
 
-func Parse(line string) (*Result, error){
-	// function Parse(line):
-
+func Parse(line string) (*CommandDetails, error){
     // tokens = tokenize(line)
+    tokens, err := tokenize(line)
     // if error → return error
+    if err != nil {
+        return nil, err
+    }
 
     // create empty CommandDetails cmd
+    cmd := CommandDetails{}
+
+    
 
     // i = 0
+    i := 0
     // while i < length(tokens):
+    for i < len(tokens) {
+        // token = tokens[i]
+        token := tokens[i]
 
-    //     token = tokens[i]
+        //     switch token:
+        switch token {
+        case "<":
+            if i+1 >= len(tokens) {
+                return nil, fmt.Errorf("missing input file")
+            }
 
-    //     switch token:
+            cmd.InputFile = tokens[i+1]
+            i+=2
+            continue
+        case ">":
+            if i+1 >= len(tokens) {
+                return nil, fmt.Errorf("missing output file")
+            }
+            cmd.OutputFile = tokens[i+1]
+            cmd.Append=false
+            i+=2
+            continue
+        case ">>":
+            if i+1 >= len(tokens) {
+                return nil,fmt.Errorf("missing output file")
+            }
+            cmd.OutputFile = tokens[i+1]
+            cmd.Append = true
+            i+=2
+            continue
+        case "2>":
+            if i+1 >= len(tokens) {
+                return nil, fmt.Errorf("missing error file")
+            }
+            cmd.ErrorFile = tokens[i+1]
+            i+=2
+            continue
+        case "&":
+            cmd.Background = true
+            i++
+            continue
+        default:
+            cmd.Args = append(cmd.Args, token)
+            i++
+        }
+    }
 
-    //         case "<":
-    //             if i+1 >= len(tokens):
-    //                 return error("missing input file")
-    //             cmd.InputFile = tokens[i+1]
-    //             i = i + 2
-    //             continue
+    if len(cmd.Args) == 0 {
+        return nil, fmt.Errorf("no command provided")
+    }
 
-    //         case ">":
-    //             if i+1 >= len(tokens):
-    //                 return error("missing output file")
-    //             cmd.OutputFile = tokens[i+1]
-    //             cmd.Append = false
-    //             i = i + 2
-    //             continue
-
-    //         case ">>":
-    //             if i+1 >= len(tokens):
-    //                 return error("missing output file")
-    //             cmd.OutputFile = tokens[i+1]
-    //             cmd.Append = true
-    //             i = i + 2
-    //             continue
-
-    //         case "2>":
-    //             if i+1 >= len(tokens):
-    //                 return error("missing error file")
-    //             cmd.ErrorFile = tokens[i+1]
-    //             i = i + 2
-    //             continue
-
-    //         case "&":
-    //             cmd.Background = true
-    //             i = i + 1
-    //             continue
-
-    //         default:
-    //             append token to cmd.Args
-    //             i = i + 1
-
-    // if cmd.Args is empty:
-    //     return error("no command provided")
-
+	return &cmd, nil
 }
 
 func tokenize(input string) ([]string, error) { // this is to produce []string where each element is one argument/operator/filename
