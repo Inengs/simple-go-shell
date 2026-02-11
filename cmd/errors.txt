@@ -1,0 +1,2 @@
+/usr/bin/cat: nonexistent: No such file or directory
+Execution error: command failed: exit status 1

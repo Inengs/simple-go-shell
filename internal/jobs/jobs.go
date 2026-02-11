@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 )
 
 type Job struct {
@@ -92,4 +93,51 @@ func ListJobs() {
 	for _, job := range jobsMap {
 		fmt.Printf("[%d]  %s    %s\n", job.ID, job.Status, job.CommandString)
 	}
+}
+
+// Add these to your jobs package
+
+func UpdateJobStatus(jobID int, status string) {
+    for i := range jobsMap {
+        if jobsMap[i].ID == jobID {
+            jobsMap[i].Status = status
+            return
+        }
+    }
+}
+
+func RemoveCompletedJobs() {
+    var activeJobs []Job
+    
+    for _, job := range jobsMap {
+        // Check if process still exists
+        process, err := os.FindProcess(job.PID)
+        if err != nil {
+            // Process not found, skip it
+            continue
+        }
+        
+        // Try to signal the process (signal 0 doesn't actually send a signal, just checks if alive)
+        err = process.Signal(syscall.Signal(0))
+        if err != nil {
+            // Process finished, try to wait on it to clean up zombie
+            process.Wait()
+            fmt.Printf("[%d]  Done    %s\n", job.ID, job.CommandString)
+            continue
+        }
+        
+        // Process still running, keep it
+        activeJobs = append(activeJobs, job)
+    }
+    
+    jobsMap = activeJobs
+}
+
+func GetJobByID(id int) (*Job, error) {
+    for i := range jobsMap {
+        if jobsMap[i].ID == id {
+            return &jobsMap[i], nil
+        }
+    }
+    return nil, fmt.Errorf("job [%d] not found", id)
 }

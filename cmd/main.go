@@ -4,58 +4,128 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"simple_sh/internal/jobs"
+	"simple_sh/internal/parser"
+	"simple_sh/internal/util"
 	"strings"
 )
 
 var builtins = map[string]func(args []string) {
-	"cd": builtinCd,
-	"help": builtinHelp,
+	"cd":     builtinCd,
+	"help":   builtinHelp,
 	"exit":   builtinExit,
-	"pwd": builtinPwd,
-	"clear": builtinClear,
-	"echo": builtinEcho,
+	"pwd":    builtinPwd,
+	"clear":  builtinClear,
+	"echo":   builtinEcho,
 	"export": builtinExport,
-	"unset": builtinUnset,
+	"unset":  builtinUnset,
+	"jobs":   builtinJobs,
 }
 
 func main() {
+	// Setup signal handlers and load history
+	util.SetupSignalHandlers()
+	util.LoadHistory()
 	
-	reader := bufio.NewReader(os.Stdin) // access the input and create a buffered reade around it so i can read a chunk of it at a time
-	fmt.Println("Enter your instruction")
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Fprintln(os.Stderr, "Welcome to Simple Shell!")
+	fmt.Fprintln(os.Stderr, "Type 'help' for available commands")
 
 	for {
-		fmt.Print("The shell is ready")
+		fmt.Fprint(os.Stderr, "shell> ")
 
 		input, err := reader.ReadString('\n')
-
 		if err != nil {
 			fmt.Println("Error reading input:", err)
 			return
 		}
 
-		// trim empty space
 		input = strings.TrimSpace(input)
 
-		// if the input is empty, go back to prompt
 		if input == "" {
 			continue
 		}
 
-		if input == "exit" || input == "quit" {
-			fmt.Println("Goodbye!")
-			break // Break out of the infinite loop
+		// Remove comments
+		input = util.RemoveComments(input)
+		if input == "" {
+			continue
 		}
 
-		parts := strings.Fields(input)
-		command := parts[0]
+		// Validate command
+		if err := util.ValidateCommand(input); err != nil {
+			fmt.Println("Error:", err)
+			continue
+		}
 
-		if builtinFunc, exists := builtins[command]; exists {
-			builtinFunc(parts)
+		// Expand variables
+		input = util.ExpandVariables(input)
+
+		// Save to history
+		util.SaveToHistory(input)
+
+		// Parse the command
+		cmd, err := parser.Parse(input)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Parse error:", err)
+			continue
+		}
+
+		// Handle redirection
+		stdin, stdout, stderr, err := util.SetupRedirection(cmd)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Redirection error:", err)
+			continue
+		}
+
+		// Save original streams
+		oldStdin := os.Stdin
+		oldStdout := os.Stdout
+		oldStderr := os.Stderr
+
+		// Apply redirections BEFORE executing
+		if stdin != nil {
+			os.Stdin = stdin
+		}
+		if stdout != nil {
+			os.Stdout = stdout
+		}
+		if stderr != nil {
+			os.Stderr = stderr
+		}
+
+		// Check if it's a builtin
+		if builtinFunc, exists := builtins[cmd.Args[0]]; exists {
+			builtinFunc(cmd.Args)
 		} else {
-			fmt.Printf("Command not found: %s\n", command)
+			// Execute external command
+			err = jobs.ExecuteCommandWithJobs(cmd.Args)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "Execution error:", err)
+			}
 		}
+
+		// Restore streams IMMEDIATELY
+		util.RestoreStandardStreams(oldStdin, oldStdout, oldStderr)
+
+		// Close files
+		if stdin != nil {
+			stdin.Close()
+		}
+		if stdout != nil {
+			stdout.Close()
+		}
+		if stderr != nil {
+			stderr.Close()
+		}
+
+		// Clean up finished jobs
+		jobs.RemoveCompletedJobs()
 	}
-	
+}
+
+func builtinJobs(args []string) {
+	jobs.ListJobs()
 }
 
 func builtinExit(args []string) {
@@ -64,37 +134,32 @@ func builtinExit(args []string) {
 }
 
 func builtinCd(args []string) {
-	// this is the function to change the directory
 	var path string
 
-	// if no argument, go to home directory
 	if len(args) < 2 {
-		homeDir, err := os.UserHomeDir() // go to home directory
-
+		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			fmt.Println(fmt.Errorf("cd: error getting home directory: %w", err))
+			fmt.Println("cd: error getting home directory:", err)
+			return
 		}
-
 		path = homeDir
 	} else {
-		path = args[1]
+		// Expand tilde
+		path = util.ExpandTilde(args[1])
 	}
 
-	// Change directory
 	err := os.Chdir(path)
-
 	if err != nil {
-		fmt.Println(fmt.Errorf("cd: %w", err))
+		fmt.Println("cd:", err)
 	}
 }
 
 func builtinPwd(args []string) {
 	workingDir, err := os.Getwd()
-
 	if err != nil {
-		fmt.Println(fmt.Errorf("working directory: %w", err))
+		fmt.Println("pwd:", err)
 	} else {
-		fmt.Printf("%s", workingDir)
+		fmt.Println(workingDir)
 	}
 }
 
@@ -108,7 +173,7 @@ func builtinEcho(args []string) {
 }
 
 func builtinClear(args []string) {
-	fmt.Println("\033[H\033[2J")
+	fmt.Print("\033[H\033[2J")
 }
 
 func builtinExport(args []string) {
@@ -155,6 +220,7 @@ func builtinHelp(args []string) {
 	fmt.Println("  clear              - Clear the screen")
 	fmt.Println("  export VAR=value   - Set environment variable")
 	fmt.Println("  unset VAR          - Unset environment variable")
+	fmt.Println("  jobs               - List background jobs")
 	fmt.Println("  help               - Show this help message")
 	fmt.Println("  exit               - Exit the shell")
 }
